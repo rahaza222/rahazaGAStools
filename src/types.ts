@@ -1,11 +1,4 @@
-export type View = 'dashboard' | 'merger' | 'pwa';
-
-export interface MergerModule {
-  id: string;
-  name: string;
-  gs: string;
-  html: string;
-}
+export type View = 'dashboard' | 'pwa';
 
 export type IconType = 'url' | 'text' | 'image';
 
