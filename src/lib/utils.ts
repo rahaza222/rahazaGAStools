@@ -42,6 +42,13 @@ export function createSVGString(
 }
 
 export function getKbSize(str: string): string {
-  const bytes = new Blob([str]).size;
-  return (bytes / 1024).toFixed(2);
+  try {
+    if (typeof TextEncoder !== 'undefined') {
+      const bytes = new TextEncoder().encode(str).length;
+      return (bytes / 1024).toFixed(2);
+    }
+  } catch {
+    // fallback
+  }
+  return ((str || '').length / 1024).toFixed(2);
 }
