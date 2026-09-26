@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, AppWindow, UserCircle, Menu } from 'lucide-react';
+import { LayoutDashboard, AppWindow, UserCircle, Menu, Layers } from 'lucide-react';
 import { View } from '../types';
 
 interface LayoutProps {
@@ -13,6 +13,7 @@ export function Layout({ currentView, setView, children }: LayoutProps) {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'merger', label: 'GAS Merger', icon: Layers },
     { id: 'pwa', label: 'PWA XML', icon: AppWindow },
   ] as const;
 

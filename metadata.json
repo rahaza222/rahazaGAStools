@@ -1,6 +1,8 @@
 {
-  "name": "",
-  "description": "",
+  "name": "WebApp Merger & PWA Suite",
+  "description": "Tools penggabung modul Google Apps Script (GAS) dan generator template XML PWA untuk WebApp Blogger.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
