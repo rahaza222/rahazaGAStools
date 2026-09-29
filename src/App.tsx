@@ -7,6 +7,7 @@ import { View, PwaConfig } from './types';
 import { getCurrentLicenseStatus, LicenseStatus } from './lib/license';
 import { LicenseActivationModal } from './components/LicenseActivationModal';
 import { AdminLicenseGeneratorModal } from './components/AdminLicenseGeneratorModal';
+import { TrialExpiredLockoutModal } from './components/TrialExpiredLockoutModal';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<View>('generator');
@@ -17,6 +18,16 @@ export default function App() {
   const refreshLicense = () => {
     setLicenseStatus(getCurrentLicenseStatus());
   };
+
+  // 1-second interval timer for real-time countdown when in trial
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const current = getCurrentLicenseStatus();
+      setLicenseStatus(current);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   // 🚪 3 Cara Membuka Portal Rahasia Admin:
   // 1. Shortcut Keyboard (Ctrl + Shift + A atau Cmd + Shift + A)
@@ -96,7 +107,7 @@ export default function App() {
       <Layout 
         currentView={currentView} 
         setView={setCurrentView}
-        isPro={licenseStatus.isPro}
+        licenseStatus={licenseStatus}
         onOpenUpgradeModal={() => setIsLicenseModalOpen(true)}
         onOpenAdminPortal={() => setIsAdminModalOpen(true)}
       >
@@ -120,6 +131,14 @@ export default function App() {
           <PwaGuide />
         )}
       </Layout>
+
+      {/* Full Screen Lockout Screen when Trial is Expired */}
+      <TrialExpiredLockoutModal
+        isOpen={licenseStatus.isExpired && licenseStatus.tier !== 'pro_lifetime'}
+        licenseStatus={licenseStatus}
+        onLicenseActivated={refreshLicense}
+        onOpenAdminPortal={() => setIsAdminModalOpen(true)}
+      />
 
       {/* User License Activation Modal */}
       <LicenseActivationModal

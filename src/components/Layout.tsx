@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import { 
-  AppWindow, Smartphone, BookOpen, Menu, Sparkles, ExternalLink, Crown 
+  AppWindow, Smartphone, BookOpen, Menu, Sparkles, ExternalLink, Crown, Clock, AlertTriangle 
 } from 'lucide-react';
 import { View } from '../types';
+import { PWAInstallButton } from './PWAInstallButton';
+import { OfflineIndicator } from './OfflineIndicator';
+import { TrialCountdownBadge } from './TrialCountdownBadge';
+import { LicenseStatus } from '../lib/license';
 
 interface LayoutProps {
   currentView: View;
   setView: (view: View) => void;
   children: React.ReactNode;
-  isPro: boolean;
+  licenseStatus: LicenseStatus;
   onOpenUpgradeModal: () => void;
   onOpenAdminPortal?: () => void;
 }
@@ -17,7 +21,7 @@ export function Layout({
   currentView, 
   setView, 
   children,
-  isPro,
+  licenseStatus,
   onOpenUpgradeModal,
 }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -28,15 +32,22 @@ export function Layout({
     { id: 'guide', label: 'Panduan Pasang', icon: BookOpen, desc: 'Langkah Pasang di Blogger.com' },
   ] as const;
 
+  const isLifetime = licenseStatus.tier === 'pro_lifetime';
+  const isTrial = licenseStatus.tier === 'trial';
+  const isExpired = licenseStatus.isExpired;
+
   return (
     <div className="min-h-screen bg-slate-50 text-gray-800 font-sans flex flex-col antialiased">
       {/* Background ambient accents */}
       <div className="fixed top-[-10%] left-[-5%] w-[450px] h-[450px] bg-blue-100/60 rounded-full blur-[120px] pointer-events-none -z-10" />
       <div className="fixed bottom-[-10%] right-[-5%] w-[400px] h-[400px] bg-indigo-100/50 rounded-full blur-[100px] pointer-events-none -z-10" />
 
+      {/* Offline Status Floating Indicator */}
+      <OfflineIndicator />
+
       {/* Header */}
-      <header className="h-[64px] shrink-0 border-b border-gray-200 sticky top-0 flex items-center justify-between px-4 sm:px-8 bg-white/90 backdrop-blur-md z-30 shadow-xs">
-        <div className="flex items-center space-x-3">
+      <header className="h-[64px] shrink-0 border-b border-gray-200 sticky top-0 flex items-center justify-between px-3 sm:px-8 bg-white/95 backdrop-blur-md z-30 shadow-xs">
+        <div className="flex items-center space-x-2.5 sm:space-x-3">
           <button
             className="md:hidden p-2 text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-100"
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -45,7 +56,7 @@ export function Layout({
             <Menu className="w-5 h-5" />
           </button>
           
-          <div className="w-9 h-9 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-sm text-white">
+          <div className="w-9 h-9 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-sm text-white shrink-0">
             <AppWindow className="w-5 h-5" />
           </div>
 
@@ -54,14 +65,20 @@ export function Layout({
               <h1 className="text-base font-bold text-gray-900 tracking-tight leading-tight">
                 Rahaza PWA XML
               </h1>
-              {isPro ? (
+              {isLifetime ? (
                 <span className="bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-2xs">
                   <Crown className="w-3 h-3" />
                   PRO ACTIVE
                 </span>
+              ) : isTrial ? (
+                <span className="bg-indigo-100 text-indigo-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 border border-indigo-200">
+                  <Clock className="w-3 h-3 text-indigo-600" />
+                  TRIAL 24 JAM
+                </span>
               ) : (
-                <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                  FREE PLAN
+                <span className="bg-rose-100 text-rose-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 border border-rose-200">
+                  <AlertTriangle className="w-3 h-3 text-rose-600" />
+                  TRIAL HABIS
                 </span>
               )}
             </div>
@@ -72,7 +89,7 @@ export function Layout({
         </div>
 
         {/* Desktop Quick Nav Tabs in Header */}
-        <div className="hidden md:flex items-center space-x-1 bg-gray-100 p-1 rounded-xl border border-gray-200">
+        <div className="hidden lg:flex items-center space-x-1 bg-gray-100 p-1 rounded-xl border border-gray-200">
           {navItems.map(item => {
             const isActive = currentView === item.id;
             const Icon = item.icon;
@@ -94,8 +111,19 @@ export function Layout({
         </div>
 
         {/* Right CTA Actions */}
-        <div className="flex items-center space-x-2 sm:space-x-3 text-xs">
-          {isPro ? (
+        <div className="flex items-center space-x-2 sm:space-x-2.5 text-xs">
+          {/* Trial Countdown Badge / Status */}
+          <div className="hidden sm:block">
+            <TrialCountdownBadge 
+              licenseStatus={licenseStatus} 
+              onClick={onOpenUpgradeModal} 
+            />
+          </div>
+
+          {/* PWA In-App Install Button */}
+          <PWAInstallButton variant="header" />
+
+          {isLifetime ? (
             <button
               onClick={onOpenUpgradeModal}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 text-amber-900 font-bold text-xs hover:border-amber-400 transition-all cursor-pointer shadow-2xs"
@@ -124,7 +152,7 @@ export function Layout({
             href="https://www.blogger.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden lg:flex items-center gap-1.5 text-gray-600 hover:text-blue-600 transition-colors font-medium text-xs bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-lg border border-gray-200"
+            className="hidden xl:flex items-center gap-1.5 text-gray-600 hover:text-blue-600 transition-colors font-medium text-xs bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-lg border border-gray-200"
           >
             <span>Blogger.com</span>
             <ExternalLink className="w-3.5 h-3.5" />
@@ -143,20 +171,32 @@ export function Layout({
         )}
         
         <aside
-          className={`fixed md:hidden inset-y-0 left-0 w-[260px] border-r border-gray-200 flex flex-col p-6 space-y-4 bg-white z-50 transform transition-transform duration-200 shadow-xl ${
+          className={`fixed md:hidden inset-y-0 left-0 w-[270px] border-r border-gray-200 flex flex-col p-6 space-y-4 bg-white z-50 transform transition-transform duration-200 shadow-xl ${
             isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
-          <div className="flex items-center gap-2 pb-4 border-b border-gray-100">
+          <div className="flex items-center gap-2.5 pb-4 border-b border-gray-100">
             <div className="w-8 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center font-bold">
               R
             </div>
             <div>
               <div className="font-bold text-sm text-gray-900">Rahaza PWA</div>
-              <div className="text-[10px] text-gray-500">
-                {isPro ? '👑 PRO Lifetime Active' : 'Free Version'}
+              <div className="text-[10px] text-gray-500 font-medium">
+                {isLifetime ? '👑 PRO Lifetime Active' : isTrial ? '⏱️ Masa Trial 24 Jam' : '🔒 Trial Expired'}
               </div>
             </div>
+          </div>
+
+          {/* Trial countdown badge inside mobile drawer */}
+          <div className="w-full">
+            <TrialCountdownBadge 
+              licenseStatus={licenseStatus} 
+              onClick={() => {
+                setIsSidebarOpen(false);
+                onOpenUpgradeModal();
+              }}
+              className="w-full justify-center py-2"
+            />
           </div>
 
           <div className="space-y-1">
@@ -184,9 +224,14 @@ export function Layout({
             })}
           </div>
 
-          {/* Upgrade in Mobile Nav */}
+          {/* In-App Install Button inside Drawer */}
           <div className="pt-2">
-            {!isPro ? (
+            <PWAInstallButton variant="drawer" />
+          </div>
+
+          {/* Upgrade in Mobile Nav */}
+          <div className="pt-1">
+            {!isLifetime ? (
               <button
                 onClick={() => {
                   setIsSidebarOpen(false);
@@ -220,7 +265,11 @@ export function Layout({
           <span className="font-medium text-gray-700">Rahaza PWA XML Suite</span>
           <span className="hidden sm:inline text-gray-300">|</span>
           <span className="hidden sm:inline text-gray-500">
-            {isPro ? 'Versi PRO White-Label Aktif' : 'Free Version • Tersedia Upgrade PRO'}
+            {isLifetime 
+              ? 'Versi PRO White-Label Aktif' 
+              : isTrial 
+                ? 'Masa Uji Coba 24 Jam Aktif • Akses Penuh PRO' 
+                : 'Masa Trial Habis • Silakan Upgrade'}
           </span>
         </div>
         

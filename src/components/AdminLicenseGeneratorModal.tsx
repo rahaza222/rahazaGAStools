@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, Lock, Key, Check, Copy, Trash2, Plus, 
-  Sparkles, AlertCircle, LogOut, ShieldCheck, Smartphone, 
-  Globe, MessageSquare, History, KeyRound, HelpCircle, CheckCircle2
+  Sparkles, AlertCircle, ShieldCheck, Smartphone, 
+  Globe, MessageSquare, History, KeyRound, HelpCircle, CheckCircle2, Clock, AlertTriangle
 } from 'lucide-react';
 import { 
   DEFAULT_ADMIN_PIN,
@@ -16,7 +16,9 @@ import {
   clearAllGeneratedLicenses,
   verifyAdminPin,
   changeAdminPin,
-  buildWhatsAppReplyMessage
+  buildWhatsAppReplyMessage,
+  resetTrialForTesting,
+  expireTrialForTesting,
 } from '../lib/license';
 
 interface AdminLicenseGeneratorModalProps {
@@ -38,7 +40,8 @@ export function AdminLicenseGeneratorModal({
   const [activeTab, setActiveTab] = useState<'generator' | 'history' | 'security'>('generator');
 
   // Generator form states
-  const [licenseType, setLicenseType] = useState<LicenseType>('device');
+  const [licenseType, setLicenseType] = useState<LicenseType>('lifetime_device');
+  const [trialHours, setTrialHours] = useState<number>(24);
   const [buyerName, setBuyerName] = useState('');
   const [targetDeviceId, setTargetDeviceId] = useState('');
   const [generatedResult, setGeneratedResult] = useState<GeneratedLicenseRecord | null>(null);
@@ -56,11 +59,15 @@ export function AdminLicenseGeneratorModal({
   const [confirmPin, setConfirmPin] = useState('');
   const [securityMessage, setSecurityMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
+  // Testing feedback toast
+  const [testActionNotice, setTestActionNotice] = useState<string | null>(null);
+
   useEffect(() => {
     if (isOpen) {
       setLicenses(getGeneratedLicenses());
       setPinError('');
       setSecurityMessage(null);
+      setTestActionNotice(null);
     }
   }, [isOpen]);
 
@@ -95,20 +102,20 @@ export function AdminLicenseGeneratorModal({
 
   const handleGenerate = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (licenseType === 'device' && !targetDeviceId.trim()) {
+    if (licenseType === 'lifetime_device' && !targetDeviceId.trim()) {
       alert('Untuk tipe Khusus Perangkat, harap masukkan Device ID pembeli.');
       return;
     }
 
     const note = buyerName.trim() || `Pelanggan #${licenses.length + 1}`;
-    const result = generateLicenseKey(note, licenseType, targetDeviceId.trim());
+    const result = generateLicenseKey(note, licenseType, targetDeviceId.trim() || undefined, trialHours);
     setGeneratedResult(result);
     refreshList();
   };
 
   const handleGenerateBatchUniversal = (count: number = 5) => {
     for (let i = 0; i < count; i++) {
-      generateLicenseKey(`Batch #${licenses.length + i + 1}`, 'universal');
+      generateLicenseKey(`Batch #${licenses.length + i + 1}`, 'lifetime_universal');
     }
     refreshList();
   };
@@ -140,30 +147,17 @@ export function AdminLicenseGeneratorModal({
         document.body.removeChild(textArea);
       }
       setCopiedKey(id);
-      setTimeout(() => setCopiedKey(null), 2000);
+      setTimeout(() => setCopiedKey(null), 2500);
     } catch {
-      // ignore
+      // fallback
     }
   };
 
   const copyWaFormat = (record: GeneratedLicenseRecord) => {
-    const text = buildWhatsAppReplyMessage(record);
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text);
-      } else {
-        const textArea = document.createElement('textarea');
-        textArea.value = text;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-      }
-      setCopiedWaText(true);
-      setTimeout(() => setCopiedWaText(false), 2000);
-    } catch {
-      // ignore
-    }
+    const msg = buildWhatsAppReplyMessage(record);
+    copyToClipboard(msg, `WA-${record.key}`);
+    setCopiedWaText(true);
+    setTimeout(() => setCopiedWaText(false), 2500);
   };
 
   const handleChangePinSubmit = (e: React.FormEvent) => {
@@ -171,31 +165,36 @@ export function AdminLicenseGeneratorModal({
     setSecurityMessage(null);
 
     if (newPin !== confirmPin) {
-      setSecurityMessage({ text: 'Konfirmasi PIN baru tidak cocok.', isError: true });
+      setSecurityMessage({ text: 'Konfirmasi PIN baru tidak sama.', isError: true });
       return;
     }
 
     const res = changeAdminPin(oldPin, newPin);
+    setSecurityMessage({ text: res.message, isError: !res.success });
     if (res.success) {
-      setSecurityMessage({ text: res.message, isError: false });
       setOldPin('');
       setNewPin('');
       setConfirmPin('');
-    } else {
-      setSecurityMessage({ text: res.message, isError: true });
     }
   };
 
-  const handleLock = () => {
-    setIsAuthenticated(false);
-    setPinInput('');
-    setGeneratedResult(null);
-    setActiveTab('generator');
+  const handleResetTrial = () => {
+    resetTrialForTesting(24);
+    refreshList();
+    setTestActionNotice('Masa trial 24 jam berhasil di-reset ulang ke kondisi awal.');
+    setTimeout(() => setTestActionNotice(null), 3500);
+  };
+
+  const handleExpireTrial = () => {
+    expireTrialForTesting();
+    refreshList();
+    setTestActionNotice('Masa trial dipaksa EXPIRED! Layar kunci akan muncul.');
+    setTimeout(() => setTestActionNotice(null), 3500);
   };
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div 
@@ -218,7 +217,7 @@ export function AdminLicenseGeneratorModal({
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Rahaza PWA XML PRO — Modul Terenkripsi Offline untuk Menerbitkan Serial Key.
+                Rahaza PWA XML PRO — Modul Terenkripsi Offline untuk Menerbitkan Serial Key &amp; Trial.
               </p>
             </div>
           </div>
@@ -297,7 +296,7 @@ export function AdminLicenseGeneratorModal({
                 }`}
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Tab 1: ⚡ Buat Lisensi</span>
+                <span>Tab 1: ⚡ Buat Lisensi &amp; Trial</span>
               </button>
 
               <button
@@ -327,6 +326,14 @@ export function AdminLicenseGeneratorModal({
 
             {/* Tab Panels */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Developer testing notice */}
+              {testActionNotice && (
+                <div className="p-3 bg-blue-50 border border-blue-200 text-blue-800 text-xs font-bold rounded-xl flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>{testActionNotice}</span>
+                </div>
+              )}
+
               {/* TAB 1: GENERATOR */}
               {activeTab === 'generator' && (
                 <div className="space-y-6">
@@ -347,10 +354,11 @@ export function AdminLicenseGeneratorModal({
                       <label className="block text-xs font-bold text-gray-700 mb-2">
                         Pilih Tipe Lisensi:
                       </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        {/* Device Locked */}
                         <label 
                           className={`p-3 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
-                            licenseType === 'device' 
+                            licenseType === 'lifetime_device' 
                               ? 'bg-white border-blue-500 shadow-xs ring-2 ring-blue-500/10' 
                               : 'bg-white/60 border-gray-200 hover:bg-white'
                           }`}
@@ -358,24 +366,25 @@ export function AdminLicenseGeneratorModal({
                           <input
                             type="radio"
                             name="licenseType"
-                            checked={licenseType === 'device'}
-                            onChange={() => setLicenseType('device')}
+                            checked={licenseType === 'lifetime_device'}
+                            onChange={() => setLicenseType('lifetime_device')}
                             className="mt-1"
                           />
                           <div>
                             <div className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
                               <Smartphone className="w-3.5 h-3.5 text-blue-600" />
-                              <span>Khusus Perangkat (Terkunci Device ID)</span>
+                              <span>PRO (Lock Device)</span>
                             </div>
                             <p className="text-[11px] text-gray-500 mt-0.5">
-                              Direkomendasikan! Mencegah serial key dibagikan/dipakai di perangkat lain.
+                              Terkunci Device ID. Permanen seumur hidup.
                             </p>
                           </div>
                         </label>
 
+                        {/* Universal */}
                         <label 
                           className={`p-3 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
-                            licenseType === 'universal' 
+                            licenseType === 'lifetime_universal' 
                               ? 'bg-white border-blue-500 shadow-xs ring-2 ring-blue-500/10' 
                               : 'bg-white/60 border-gray-200 hover:bg-white'
                           }`}
@@ -383,26 +392,83 @@ export function AdminLicenseGeneratorModal({
                           <input
                             type="radio"
                             name="licenseType"
-                            checked={licenseType === 'universal'}
-                            onChange={() => setLicenseType('universal')}
+                            checked={licenseType === 'lifetime_universal'}
+                            onChange={() => setLicenseType('lifetime_universal')}
                             className="mt-1"
                           />
                           <div>
                             <div className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
                               <Globe className="w-3.5 h-3.5 text-indigo-600" />
-                              <span>Universal (Bisa Semua Perangkat)</span>
+                              <span>PRO (Universal)</span>
                             </div>
                             <p className="text-[11px] text-gray-500 mt-0.5">
-                              Bisa diaktifkan di mana saja. Cocok untuk hadiah, giveaway, atau tim Anda.
+                              Bisa diaktifkan di perangkat mana saja.
+                            </p>
+                          </div>
+                        </label>
+
+                        {/* Trial Limited Time */}
+                        <label 
+                          className={`p-3 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
+                            licenseType === 'trial' 
+                              ? 'bg-white border-amber-500 shadow-xs ring-2 ring-amber-500/10' 
+                              : 'bg-white/60 border-gray-200 hover:bg-white'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="licenseType"
+                            checked={licenseType === 'trial'}
+                            onChange={() => setLicenseType('trial')}
+                            className="mt-1"
+                          />
+                          <div>
+                            <div className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Trial Terbatas</span>
+                            </div>
+                            <p className="text-[11px] text-gray-500 mt-0.5">
+                              Uji coba waktu terbatas (misal 24 jam / 3 hari).
                             </p>
                           </div>
                         </label>
                       </div>
                     </div>
 
+                    {/* Trial Duration Selector (Shown when licenseType is 'trial') */}
+                    {licenseType === 'trial' && (
+                      <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2">
+                        <label className="block text-xs font-bold text-amber-900">
+                          Pilih Durasi Masa Uji Coba (Trial):
+                        </label>
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                          {[
+                            { hours: 24, label: '24 Jam (1 Hari)' },
+                            { hours: 72, label: '3 Hari' },
+                            { hours: 168, label: '7 Hari' },
+                            { hours: 336, label: '14 Hari' },
+                            { hours: 720, label: '30 Hari' },
+                          ].map(opt => (
+                            <button
+                              key={opt.hours}
+                              type="button"
+                              onClick={() => setTrialHours(opt.hours)}
+                              className={`py-2 px-2.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer text-center ${
+                                trialHours === opt.hours
+                                  ? 'bg-amber-600 text-white border-amber-700 shadow-xs font-bold'
+                                  : 'bg-white text-gray-700 border-gray-300 hover:bg-amber-100/50'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Inputs */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                      {licenseType === 'device' && (
+                      {licenseType === 'lifetime_device' && (
                         <div>
                           <label className="block text-xs font-bold text-gray-700 mb-1">
                             Target Device ID Pembeli:
@@ -412,7 +478,7 @@ export function AdminLicenseGeneratorModal({
                             value={targetDeviceId}
                             onChange={e => setTargetDeviceId(e.target.value.toUpperCase())}
                             placeholder="Contoh: RHZ-9X82-K3L9"
-                            required={licenseType === 'device'}
+                            required={licenseType === 'lifetime_device'}
                             className="w-full text-xs font-mono px-3.5 py-2.5 bg-white border border-blue-200 rounded-xl focus:outline-none focus:border-blue-500 uppercase font-semibold"
                           />
                           <p className="text-[10px] text-gray-500 mt-1">
@@ -421,7 +487,7 @@ export function AdminLicenseGeneratorModal({
                         </div>
                       )}
 
-                      <div className={licenseType === 'universal' ? 'sm:col-span-2' : ''}>
+                      <div className={licenseType !== 'lifetime_device' ? 'sm:col-span-2' : ''}>
                         <label className="block text-xs font-bold text-gray-700 mb-1">
                           Nama / Kode Pembeli:
                         </label>
@@ -429,7 +495,7 @@ export function AdminLicenseGeneratorModal({
                           type="text"
                           value={buyerName}
                           onChange={e => setBuyerName(e.target.value)}
-                          placeholder="Contoh: BUDI, SITI, atau ORDER-102"
+                          placeholder="Contoh: BUDI, SITI, atau TRIAL-DEMO"
                           className="w-full text-xs px-3.5 py-2.5 bg-white border border-blue-200 rounded-xl focus:outline-none focus:border-blue-500 uppercase font-semibold"
                         />
                         <p className="text-[10px] text-gray-500 mt-1">
@@ -443,7 +509,11 @@ export function AdminLicenseGeneratorModal({
                       className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer mt-2"
                     >
                       <Plus className="w-4 h-4" />
-                      <span>Generate Serial Key Pembeli Sekarang</span>
+                      <span>
+                        {licenseType === 'trial' 
+                          ? `Generate Serial Key Trial (${trialHours} Jam)` 
+                          : 'Generate Serial Key PRO Pembeli Sekarang'}
+                      </span>
                     </button>
                   </form>
 
@@ -453,7 +523,11 @@ export function AdminLicenseGeneratorModal({
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-emerald-950 font-extrabold text-xs">
                           <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                          <span>Serial Key Resmi Terbentuk!</span>
+                          <span>
+                            {generatedResult.type === 'trial' 
+                              ? `Kode Lisensi Trial (${generatedResult.trialHours} Jam) Terbentuk!` 
+                              : 'Serial Key Resmi Terbentuk!'}
+                          </span>
                         </div>
                         <span className="text-[10px] bg-emerald-200 text-emerald-900 font-bold px-2 py-0.5 rounded-full">
                           SIAP KIRIM
@@ -464,7 +538,7 @@ export function AdminLicenseGeneratorModal({
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-white border border-emerald-300 rounded-xl p-3 gap-2">
                         <div>
                           <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">
-                            Serial Key ({generatedResult.type === 'device' ? 'Locked Device ID' : 'Universal'}):
+                            Serial Key ({generatedResult.type === 'trial' ? `Trial ${generatedResult.trialHours} Jam` : generatedResult.type === 'lifetime_device' ? 'Locked Device ID' : 'Universal'}):
                           </div>
                           <code className="font-mono text-base font-black text-emerald-700 tracking-wider select-all">
                             {generatedResult.key}
@@ -479,24 +553,15 @@ export function AdminLicenseGeneratorModal({
                         </button>
                       </div>
 
-                      {/* Template WhatsApp */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                            <MessageSquare className="w-3.5 h-3.5 text-emerald-700" />
-                            <span>Format Balasan WhatsApp Siap Kirim ke Pembeli:</span>
-                          </label>
-                          <button
-                            onClick={() => copyWaFormat(generatedResult)}
-                            className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                          >
-                            {copiedWaText ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                            <span>{copiedWaText ? 'Format WA Tersalin!' : 'Salin Format WA'}</span>
-                          </button>
-                        </div>
-                        <pre className="p-3 bg-white/90 border border-emerald-200 rounded-xl text-[11px] text-gray-800 whitespace-pre-wrap font-sans max-h-48 overflow-y-auto leading-relaxed">
-                          {buildWhatsAppReplyMessage(generatedResult)}
-                        </pre>
+                      {/* Tombol Salin Format WA */}
+                      <div className="pt-1">
+                        <button
+                          onClick={() => copyWaFormat(generatedResult)}
+                          className="w-full py-2.5 px-4 bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+                        >
+                          <MessageSquare className="w-4 h-4 text-emerald-600" />
+                          <span>{copiedWaText ? 'Format Pesan WA Berhasil Disalin!' : 'Salin Format Pesan Lengkap WhatsApp'}</span>
+                        </button>
                       </div>
                     </div>
                   )}
@@ -518,11 +583,41 @@ export function AdminLicenseGeneratorModal({
                     </button>
                   </div>
 
+                  {/* Quick Trial Testing Controls */}
+                  <div className="p-4 bg-slate-900 text-white rounded-2xl text-xs space-y-3">
+                    <div className="flex items-center gap-2 font-bold text-slate-200">
+                      <Clock className="w-4 h-4 text-amber-400" />
+                      <span>🛠️ Kontrol Pengujian Cepat Uji Coba (Developer Mode):</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300">
+                      Gunakan tombol ini untuk menguji perilaku aplikasi dalam masa trial aktif dan kondisi terkunci:
+                    </p>
+                    <div className="flex flex-wrap gap-2.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleResetTrial}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>🔄 Reset Ulang Trial ke 24 Jam Penuh</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleExpireTrial}
+                        className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        <span>⚠️ Paksa Trial Expired (Uji Layar Terkunci)</span>
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Demo Keys Info */}
                   <div className="p-4 bg-amber-50/70 border border-amber-200/80 rounded-2xl text-xs space-y-2">
                     <div className="font-bold text-amber-900 flex items-center gap-1.5">
                       <ShieldCheck className="w-4 h-4 text-amber-700" />
-                      <span>🎁 Master Lisensi Demo / Uji Coba Bawaan:</span>
+                      <span>🎁 Master Lisensi Demo Bawaan:</span>
                     </div>
                     <p className="text-[11px] text-amber-800">
                       Kunci master berikut sudah terprogram di mesin offline dan bisa langsung diaktifkan di menu Upgrade PRO untuk pengujian:
@@ -583,11 +678,13 @@ export function AdminLicenseGeneratorModal({
                                 {item.key}
                               </code>
                               <span className={`text-[10px] font-bold px-2 py-0.2 rounded-full ${
-                                item.type === 'device' 
-                                  ? 'bg-purple-100 text-purple-800' 
-                                  : 'bg-emerald-100 text-emerald-800'
+                                item.type === 'trial'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : item.type === 'lifetime_device' 
+                                    ? 'bg-purple-100 text-purple-800' 
+                                    : 'bg-emerald-100 text-emerald-800'
                               }`}>
-                                {item.type === 'device' ? 'Device Lock' : 'Universal'}
+                                {item.type === 'trial' ? `Trial ${item.trialHours || 24} Jam` : item.type === 'lifetime_device' ? 'Device Lock' : 'Universal'}
                               </span>
                             </div>
 
@@ -650,105 +747,91 @@ export function AdminLicenseGeneratorModal({
                   <form onSubmit={handleChangePinSubmit} className="space-y-4 bg-gray-50 p-5 rounded-2xl border border-gray-200">
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">
-                        PIN Lama / Emergency Bypass:
+                        PIN Lama atau Kode Emergency:
                       </label>
                       <input
                         type="password"
                         value={oldPin}
                         onChange={e => setOldPin(e.target.value)}
                         placeholder="PIN lama (Default: 399339)"
-                        className="w-full text-xs px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 font-mono"
                         required
+                        className="w-full text-xs px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl focus:outline-none focus:border-blue-500"
                       />
                     </div>
 
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">
-                        PIN Baru (Minimal 4 Karakter/Digit):
+                        PIN Baru (Minimal 4 Karakter):
                       </label>
                       <input
                         type="password"
                         value={newPin}
                         onChange={e => setNewPin(e.target.value)}
-                        placeholder="Masukkan PIN baru"
-                        className="w-full text-xs px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 font-mono"
+                        placeholder="PIN baru Anda"
                         required
-                        minLength={4}
+                        className="w-full text-xs px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl focus:outline-none focus:border-blue-500"
                       />
                     </div>
 
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Konfirmasi PIN Baru:
+                        Ulangi PIN Baru:
                       </label>
                       <input
                         type="password"
                         value={confirmPin}
                         onChange={e => setConfirmPin(e.target.value)}
                         placeholder="Ulangi PIN baru"
-                        className="w-full text-xs px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 font-mono"
                         required
-                        minLength={4}
+                        className="w-full text-xs px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl focus:outline-none focus:border-blue-500"
                       />
                     </div>
 
                     {securityMessage && (
                       <div className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
-                        securityMessage.isError 
-                          ? 'bg-red-50 text-red-700 border border-red-200' 
-                          : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                        securityMessage.isError ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'
                       }`}>
-                        {securityMessage.isError ? (
-                          <AlertCircle className="w-4 h-4 shrink-0" />
-                        ) : (
-                          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-                        )}
+                        {securityMessage.isError ? <AlertCircle className="w-4 h-4 shrink-0" /> : <CheckCircle2 className="w-4 h-4 shrink-0" />}
                         <span>{securityMessage.text}</span>
                       </div>
                     )}
 
                     <button
                       type="submit"
-                      className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
                     >
                       Simpan PIN Baru
                     </button>
                   </form>
-
-                  <div className="p-3.5 bg-slate-100 rounded-xl text-[11px] text-gray-600 space-y-1">
-                    <span className="font-bold text-gray-800 block">Catatan Keamanan Darurat:</span>
-                    <p>
-                      Jika Anda lupa PIN baru, kode rescue <code className="font-mono font-bold text-gray-900 bg-white px-1 py-0.5 rounded border border-gray-200">{EMERGENCY_BYPASS_CODE}</code> akan selalu dapat digunakan untuk membuka panel ini.
-                    </p>
-                  </div>
                 </div>
               )}
             </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between text-xs text-gray-500">
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
+                <span>Modul Generator &amp; Trial Terenkripsi Aktif</span>
+              </div>
+              <button
+                onClick={() => setIsAuthenticated(false)}
+                className="text-gray-500 hover:text-gray-800 font-semibold flex items-center gap-1 cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Kunci Kembali</span>
+              </button>
+            </div>
           </div>
         )}
-
-        {/* Footer */}
-        <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-xs">
-          {isAuthenticated ? (
-            <button
-              onClick={handleLock}
-              className="text-gray-500 hover:text-red-600 flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Kunci Sesi Admin</span>
-            </button>
-          ) : (
-            <span className="text-gray-400">PIN Master diperlukan untuk membuka portal.</span>
-          )}
-
-          <button
-            onClick={onClose}
-            className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl transition-colors cursor-pointer"
-          >
-            Tutup
-          </button>
-        </div>
       </div>
     </div>
+  );
+}
+
+function LogOut(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+    </svg>
   );
 }

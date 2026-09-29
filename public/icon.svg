@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb" />
+      <stop offset="50%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#4f46e5" />
+    </linearGradient>
+    <linearGradient id="phoneGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#e0e7ff" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#1e1b4b" flood-opacity="0.25" />
+    </filter>
+  </defs>
+
+  <!-- Background Base with rounded corners -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+
+  <!-- App Window & Mobile Screen Graphics (Safe Zone compliant) -->
+  <g filter="url(#shadow)">
+    <!-- Back Window / Browser Sheet -->
+    <rect x="96" y="106" width="320" height="230" rx="20" fill="#ffffff" fill-opacity="0.18" stroke="#ffffff" stroke-width="4" stroke-opacity="0.4" />
+    <circle cx="126" cy="128" r="6" fill="#ffffff" fill-opacity="0.6" />
+    <circle cx="146" cy="128" r="6" fill="#ffffff" fill-opacity="0.6" />
+    <circle cx="166" cy="128" r="6" fill="#ffffff" fill-opacity="0.6" />
+    
+    <!-- Central PWA Mobile Device Frame -->
+    <rect x="156" y="140" width="200" height="270" rx="26" fill="url(#phoneGrad)" stroke="#ffffff" stroke-width="6" />
+    
+    <!-- Mobile Screen Notch / Speaker bar -->
+    <rect x="226" y="152" width="60" height="6" rx="3" fill="#94a3b8" />
+    
+    <!-- Screen Content Display -->
+    <rect x="174" y="172" width="164" height="200" rx="14" fill="#0f172a" />
+    
+    <!-- PWA Lightning / Bolt Brand Emblem -->
+    <path d="M264 196 L226 266 L254 266 L242 334 L288 254 L258 254 Z" fill="#38bdf8" />
+    
+    <!-- Modern Tech Accent Dots -->
+    <circle cx="210" cy="354" r="4" fill="#38bdf8" />
+    <circle cx="256" cy="354" r="5" fill="#ffffff" />
+    <circle cx="302" cy="354" r="4" fill="#818cf8" />
+  </g>
+</svg>

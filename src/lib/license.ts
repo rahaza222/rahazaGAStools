@@ -1,8 +1,13 @@
 /**
  * Rahaza PWA XML PRO - License & Offline Cryptographic Engine
  * 
+ * Supports:
+ * - PRO Lifetime Licenses (Device-Locked & Universal)
+ * - 24-Hour Automatic Initial Trial with Heartbeat Protection
+ * - Time-Limited Trial Serial Keys (24h, 3d, 7d, 14d, 30d)
+ * - Full Lockout Management on Trial Expiration
+ * 
  * 100% Offline Deterministic Verification
- * Salt: RAHAZA_SECURE_SALT_2026_OFFLINE
  * Default Master PIN: 399339
  * Emergency Rescue Bypass: RAHAZA-ADMIN-2026
  */
@@ -19,9 +24,13 @@ const STORAGE_KEY_PRO = 'rahaza_pwa_pro_license';
 const STORAGE_KEY_LIST = 'rahaza_pwa_generated_licenses';
 const STORAGE_KEY_DEVICE_ID = 'rahaza_pwa_device_id';
 const STORAGE_KEY_PIN_HASH = 'rahaza_admin_pin_hash';
+const STORAGE_KEY_TRIAL = 'rahaza_pwa_trial_data';
+const STORAGE_KEY_HEARTBEAT = 'rahaza_pwa_last_heartbeat';
 
 // Safe uppercase characters excluding ambiguous glyphs
 const CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+export const DEFAULT_TRIAL_HOURS = 24;
 
 /**
  * Master Demo Keys (Built-in for testing & offline evaluation)
@@ -106,43 +115,55 @@ function normalizeDeviceId(id: string): string {
   return id.toUpperCase().trim().replace(/[^A-Z0-9]/g, '');
 }
 
-export type LicenseType = 'device' | 'universal';
+export type LicenseType = 'lifetime_universal' | 'lifetime_device' | 'trial';
 
 export interface GeneratedLicenseRecord {
   key: string;
   buyerName: string;
   type: LicenseType;
+  trialHours?: number;
   targetDeviceId?: string;
   createdAt: string;
 }
 
 /**
- * Generate a new License Key
- * - Khusus Perangkat: Target Device ID is hashed with Buyer Name and Salt
- * - Universal: Hashed with "UNIVERSAL" token and Salt
+ * Generate a new License Key (Lifetime or Time-Limited Trial)
  */
 export function generateLicenseKey(
   buyerName: string,
-  type: LicenseType = 'device',
-  targetDeviceId?: string
+  type: LicenseType = 'lifetime_device',
+  targetDeviceId?: string,
+  trialHours: number = 24
 ): GeneratedLicenseRecord {
   const buyerCode = sanitizeBuyerCode(buyerName);
   let hash = '';
+  let key = '';
 
-  if (type === 'device' && targetDeviceId) {
+  if (type === 'trial') {
+    // Format: RAHAZA-TRIAL-(BUYER)-(HOURS)H-(HASH6)
+    if (targetDeviceId) {
+      const cleanDevice = normalizeDeviceId(targetDeviceId);
+      hash = computeDualHash(`TRIAL_DEV:${cleanDevice}:${buyerCode}:${trialHours}`);
+    } else {
+      hash = computeDualHash(`TRIAL_UNI:${buyerCode}:${trialHours}`);
+    }
+    key = `RAHAZA-TRIAL-${buyerCode}-${trialHours}H-${hash}`;
+  } else if (type === 'lifetime_device' && targetDeviceId) {
     const cleanDevice = normalizeDeviceId(targetDeviceId);
     hash = computeDualHash(`DEVICE:${cleanDevice}:${buyerCode}`);
+    key = `RAHAZA-PRO-${buyerCode}-${hash}`;
   } else {
+    // Universal Lifetime
     hash = computeDualHash(`UNIVERSAL:${buyerCode}`);
+    key = `RAHAZA-PRO-${buyerCode}-${hash}`;
   }
-
-  const key = `RAHAZA-PRO-${buyerCode}-${hash}`;
 
   const record: GeneratedLicenseRecord = {
     key,
-    buyerName: buyerName.trim() || 'Pembeli PRO',
+    buyerName: buyerName.trim() || (type === 'trial' ? 'Pengguna Trial' : 'Pembeli PRO'),
     type,
-    targetDeviceId: type === 'device' ? (targetDeviceId || '').trim().toUpperCase() : undefined,
+    trialHours: type === 'trial' ? trialHours : undefined,
+    targetDeviceId: targetDeviceId ? targetDeviceId.trim().toUpperCase() : undefined,
     createdAt: new Date().toISOString(),
   };
 
@@ -159,55 +180,94 @@ export function generateLicenseKey(
 }
 
 /**
- * Verify if a given key is valid
- * Checks against:
- * 1. Master Demo Keys
- * 2. Locally generated keys in history
- * 3. Deterministic cryptographic verification (matches Device ID or Universal)
- * 4. Backward compatibility with legacy RHZPRO18 format
+ * Parsed key result
  */
-export function validateLicenseKey(rawKey: string, currentDeviceId?: string): boolean {
-  if (!rawKey) return false;
+export interface ParsedKeyResult {
+  isValid: boolean;
+  isTrial: boolean;
+  trialHours?: number;
+  isLifetime: boolean;
+  buyerCode?: string;
+}
+
+/**
+ * Validate and inspect a license key
+ */
+export function parseAndValidateKey(rawKey: string, currentDeviceId?: string): ParsedKeyResult {
+  if (!rawKey) return { isValid: false, isTrial: false, isLifetime: false };
   const key = rawKey.trim().toUpperCase().replace(/\s+/g, '');
   const activeDevice = currentDeviceId || getOrCreateDeviceId();
   const cleanDevice = normalizeDeviceId(activeDevice);
 
-  // 1. Check Master Demo Keys
+  // 1. Master Demo Keys (Instant Lifetime PRO)
   if (MASTER_DEMO_KEYS.includes(key)) {
-    return true;
+    return { isValid: true, isTrial: false, isLifetime: true, buyerCode: 'MASTER' };
   }
 
   // 2. Check Local Generated Licenses History
   const history = getGeneratedLicenses();
   const foundInHistory = history.find(item => item.key === key);
   if (foundInHistory) {
-    if (foundInHistory.type === 'universal') return true;
-    if (foundInHistory.targetDeviceId && normalizeDeviceId(foundInHistory.targetDeviceId) === cleanDevice) {
-      return true;
+    if (foundInHistory.type === 'trial') {
+      const matchDevice = !foundInHistory.targetDeviceId || normalizeDeviceId(foundInHistory.targetDeviceId) === cleanDevice;
+      if (matchDevice) {
+        return {
+          isValid: true,
+          isTrial: true,
+          trialHours: foundInHistory.trialHours || 24,
+          isLifetime: false,
+          buyerCode: sanitizeBuyerCode(foundInHistory.buyerName),
+        };
+      }
+    } else if (foundInHistory.type === 'lifetime_universal') {
+      return { isValid: true, isTrial: false, isLifetime: true, buyerCode: sanitizeBuyerCode(foundInHistory.buyerName) };
+    } else if (foundInHistory.targetDeviceId && normalizeDeviceId(foundInHistory.targetDeviceId) === cleanDevice) {
+      return { isValid: true, isTrial: false, isLifetime: true, buyerCode: sanitizeBuyerCode(foundInHistory.buyerName) };
     }
   }
 
-  // 3. Deterministic Cryptographic Dual-Hash Verification
-  // Match format: (RAHAZA|RHZ)-PRO-(BUYERCODE)-(HASH6)
-  const match = key.match(/^(?:RAHAZA|RHZ)-PRO-([A-Z0-9]+)-([A-Z0-9]{6})$/);
-  if (match) {
-    const buyerCode = match[1];
-    const givenHash = match[2];
+  // 3. Cryptographic Trial Key Verification
+  // Match format: RAHAZA-TRIAL-([A-Z0-9]+)-([0-9]+)H-([A-Z0-9]{6})
+  const trialMatch = key.match(/^RAHAZA-TRIAL-([A-Z0-9]+)-([0-9]+)H-([A-Z0-9]{6})$/);
+  if (trialMatch) {
+    const buyerCode = trialMatch[1];
+    const hours = parseInt(trialMatch[2], 10);
+    const givenHash = trialMatch[3];
 
-    // Check if valid as device-locked license for this device
+    // Check device locked trial
+    const expectedDev = computeDualHash(`TRIAL_DEV:${cleanDevice}:${buyerCode}:${hours}`);
+    if (givenHash === expectedDev) {
+      return { isValid: true, isTrial: true, trialHours: hours, isLifetime: false, buyerCode };
+    }
+
+    // Check universal trial
+    const expectedUni = computeDualHash(`TRIAL_UNI:${buyerCode}:${hours}`);
+    if (givenHash === expectedUni) {
+      return { isValid: true, isTrial: true, trialHours: hours, isLifetime: false, buyerCode };
+    }
+  }
+
+  // 4. Deterministic Lifetime PRO Key Verification
+  // Match format: (RAHAZA|RHZ)-PRO-(BUYERCODE)-(HASH6)
+  const proMatch = key.match(/^(?:RAHAZA|RHZ)-PRO-([A-Z0-9]+)-([A-Z0-9]{6})$/);
+  if (proMatch) {
+    const buyerCode = proMatch[1];
+    const givenHash = proMatch[2];
+
+    // Check device-locked
     const expectedDeviceHash = computeDualHash(`DEVICE:${cleanDevice}:${buyerCode}`);
     if (givenHash === expectedDeviceHash) {
-      return true;
+      return { isValid: true, isTrial: false, isLifetime: true, buyerCode };
     }
 
-    // Check if valid as universal license
+    // Check universal
     const expectedUniversalHash = computeDualHash(`UNIVERSAL:${buyerCode}`);
     if (givenHash === expectedUniversalHash) {
-      return true;
+      return { isValid: true, isTrial: false, isLifetime: true, buyerCode };
     }
   }
 
-  // 4. Legacy Checksum Support (RHZPROxxxxxxxxxxxx 18 chars)
+  // 5. Legacy Checksum Support (RHZPROxxxxxxxxxxxx 18 chars)
   if (key.startsWith('RHZPRO') && key.length === 18) {
     const payload = key.substring(6, 15);
     const check = key.substring(15, 18);
@@ -219,58 +279,223 @@ export function validateLicenseKey(rawKey: string, currentDeviceId?: string): bo
     const c2 = CHARS[Math.abs(legacyHash >> 5) % CHARS.length];
     const c3 = CHARS[Math.abs(legacyHash >> 10) % CHARS.length];
     if (`${c1}${c2}${c3}` === check) {
-      return true;
+      return { isValid: true, isTrial: false, isLifetime: true, buyerCode: 'LEGACY' };
     }
   }
 
-  return false;
+  return { isValid: false, isTrial: false, isLifetime: false };
+}
+
+export function validateLicenseKey(rawKey: string, currentDeviceId?: string): boolean {
+  return parseAndValidateKey(rawKey, currentDeviceId).isValid;
+}
+
+export type LicenseTier = 'free' | 'trial' | 'pro_lifetime';
+
+export interface StoredTrialPayload {
+  startedAt: number;        // Epoch ms
+  durationHours: number;    // e.g. 24
+  expiresAt: number;        // Epoch ms
+  deviceToken: string;
+  source: 'auto_start' | 'serial_key';
+  serialKeyUsed?: string;
+}
+
+export interface TrialState {
+  isActive: boolean;
+  isExpired: boolean;
+  startedAt: number;
+  expiresAt: number;
+  remainingSeconds: number;
+  durationHours: number;
 }
 
 export interface LicenseStatus {
-  isPro: boolean;
+  tier: LicenseTier;
+  isPro: boolean;           // true if PRO Lifetime OR active trial
+  isTrial: boolean;         // true if currently in trial status
+  isExpired: boolean;       // true if trial has expired and user has not activated PRO
   licenseKey: string | null;
   activatedAt: string | null;
   deviceId: string;
+  trial: TrialState;
 }
 
 /**
- * Retrieve current user license status from localStorage
+ * Initialize or retrieve the trial state for this device
+ */
+function getOrInitTrialData(deviceId: string): StoredTrialPayload {
+  const now = Date.now();
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_TRIAL);
+    if (raw) {
+      const data: StoredTrialPayload = JSON.parse(raw);
+      if (data && typeof data.startedAt === 'number' && typeof data.expiresAt === 'number') {
+        // Update heartbeat
+        const lastHb = parseInt(localStorage.getItem(STORAGE_KEY_HEARTBEAT) || '0', 10);
+        if (now > lastHb) {
+          localStorage.setItem(STORAGE_KEY_HEARTBEAT, now.toString());
+        }
+        return data;
+      }
+    }
+  } catch {
+    // fallback to new init
+  }
+
+  // Auto-start initial 24-hour trial for new users
+  const durationHours = DEFAULT_TRIAL_HOURS;
+  const startedAt = now;
+  const expiresAt = startedAt + durationHours * 60 * 60 * 1000;
+  const deviceToken = computeDualHash(`TRIAL_DEV_INIT:${deviceId}`);
+
+  const newTrial: StoredTrialPayload = {
+    startedAt,
+    durationHours,
+    expiresAt,
+    deviceToken,
+    source: 'auto_start',
+  };
+
+  try {
+    localStorage.setItem(STORAGE_KEY_TRIAL, JSON.stringify(newTrial));
+    localStorage.setItem(STORAGE_KEY_HEARTBEAT, now.toString());
+  } catch {
+    // ignore
+  }
+
+  return newTrial;
+}
+
+/**
+ * Retrieve current unified license and trial status
  */
 export function getCurrentLicenseStatus(): LicenseStatus {
   const deviceId = getOrCreateDeviceId();
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_PRO);
-    if (!raw) return { isPro: false, licenseKey: null, activatedAt: null, deviceId };
+  const now = Date.now();
 
-    const data = JSON.parse(raw);
-    if (data && data.licenseKey && validateLicenseKey(data.licenseKey, deviceId)) {
-      return {
-        isPro: true,
-        licenseKey: data.licenseKey,
-        activatedAt: data.activatedAt || null,
-        deviceId,
-      };
+  // 1. Check for Active PRO Lifetime License
+  try {
+    const rawPro = localStorage.getItem(STORAGE_KEY_PRO);
+    if (rawPro) {
+      const data = JSON.parse(rawPro);
+      if (data && data.licenseKey && validateLicenseKey(data.licenseKey, deviceId)) {
+        return {
+          tier: 'pro_lifetime',
+          isPro: true,
+          isTrial: false,
+          isExpired: false,
+          licenseKey: data.licenseKey,
+          activatedAt: data.activatedAt || null,
+          deviceId,
+          trial: {
+            isActive: false,
+            isExpired: false,
+            startedAt: 0,
+            expiresAt: 0,
+            remainingSeconds: 0,
+            durationHours: 0,
+          },
+        };
+      }
     }
   } catch {
-    // fallback
+    // ignore
   }
-  return { isPro: false, licenseKey: null, activatedAt: null, deviceId };
+
+  // 2. Evaluate Trial Status
+  const trialData = getOrInitTrialData(deviceId);
+  
+  // Check heartbeat anti-clock tampering
+  let effectiveNow = now;
+  try {
+    const lastHb = parseInt(localStorage.getItem(STORAGE_KEY_HEARTBEAT) || '0', 10);
+    if (lastHb > effectiveNow + 60000) {
+      // Clock was turned backward by > 1 minute, use last heartbeat to prevent clock rollback
+      effectiveNow = lastHb;
+    } else if (effectiveNow > lastHb) {
+      localStorage.setItem(STORAGE_KEY_HEARTBEAT, effectiveNow.toString());
+    }
+  } catch {
+    // ignore
+  }
+
+  const remainingMs = Math.max(0, trialData.expiresAt - effectiveNow);
+  const remainingSeconds = Math.floor(remainingMs / 1000);
+  const isExpired = remainingSeconds <= 0;
+  const isActive = !isExpired;
+
+  return {
+    tier: isActive ? 'trial' : 'free',
+    isPro: isActive, // All PRO features accessible during active trial!
+    isTrial: true,
+    isExpired: isExpired, // Application will lock if true!
+    licenseKey: trialData.serialKeyUsed || null,
+    activatedAt: new Date(trialData.startedAt).toISOString(),
+    deviceId,
+    trial: {
+      isActive,
+      isExpired,
+      startedAt: trialData.startedAt,
+      expiresAt: trialData.expiresAt,
+      remainingSeconds,
+      durationHours: trialData.durationHours,
+    },
+  };
 }
 
 /**
- * Activate user license
+ * Activate a License (Handles both Lifetime PRO keys and Trial keys)
  */
-export function activateLicense(rawKey: string): { success: boolean; message: string } {
+export function activateLicense(rawKey: string): { 
+  success: boolean; 
+  message: string;
+  tier?: LicenseTier;
+  trialHours?: number;
+} {
   const key = rawKey.trim().toUpperCase().replace(/\s+/g, '');
   const deviceId = getOrCreateDeviceId();
+  const parsed = parseAndValidateKey(key, deviceId);
 
-  if (!validateLicenseKey(key, deviceId)) {
+  if (!parsed.isValid) {
     return {
       success: false,
-      message: 'Kode lisensi tidak valid untuk perangkat ini atau salah ketik. Pastikan format diawali "RAHAZA-PRO-..." atau gunakan Device ID Anda.',
+      message: 'Kode lisensi tidak valid untuk perangkat ini atau salah ketik. Pastikan format diawali "RAHAZA-PRO-..." atau "RAHAZA-TRIAL-...".',
     };
   }
 
+  // A. Handle Trial Extension Serial Key
+  if (parsed.isTrial && parsed.trialHours) {
+    const now = Date.now();
+    const durationHours = parsed.trialHours;
+    const expiresAt = now + durationHours * 60 * 60 * 1000;
+    
+    const trialPayload: StoredTrialPayload = {
+      startedAt: now,
+      durationHours,
+      expiresAt,
+      deviceToken: computeDualHash(`TRIAL_DEV_KEY:${deviceId}:${key}`),
+      source: 'serial_key',
+      serialKeyUsed: key,
+    };
+
+    try {
+      localStorage.setItem(STORAGE_KEY_TRIAL, JSON.stringify(trialPayload));
+      localStorage.setItem(STORAGE_KEY_HEARTBEAT, now.toString());
+    } catch {
+      return { success: false, message: 'Gagal memperbarui status trial ke browser.' };
+    }
+
+    return {
+      success: true,
+      message: `Selamat! Masa uji coba (${durationHours} Jam) berhasil diaktifkan. Akses penuh fitur PRO telah dibuka!`,
+      tier: 'trial',
+      trialHours: durationHours,
+    };
+  }
+
+  // B. Handle Permanent Lifetime PRO Key
   const payload = {
     isPro: true,
     licenseKey: key,
@@ -286,16 +511,61 @@ export function activateLicense(rawKey: string): { success: boolean; message: st
 
   return {
     success: true,
-    message: 'Selamat! Akun Rahaza PWA XML PRO LIFETIME berhasil diaktifkan.',
+    message: 'Selamat! Akun Rahaza PWA XML PRO LIFETIME berhasil diaktifkan secara permanen.',
+    tier: 'pro_lifetime',
   };
 }
 
 /**
- * Deactivate user license
+ * Deactivate user license (reverts to trial or expired state)
  */
 export function deactivateLicense(): void {
   try {
     localStorage.removeItem(STORAGE_KEY_PRO);
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Developer Testing Helper: Reset trial to a fresh 24 hours
+ */
+export function resetTrialForTesting(hours: number = 24): void {
+  const deviceId = getOrCreateDeviceId();
+  const now = Date.now();
+  const trialPayload: StoredTrialPayload = {
+    startedAt: now,
+    durationHours: hours,
+    expiresAt: now + hours * 60 * 60 * 1000,
+    deviceToken: computeDualHash(`TRIAL_RESET:${deviceId}`),
+    source: 'auto_start',
+  };
+  try {
+    localStorage.removeItem(STORAGE_KEY_PRO);
+    localStorage.setItem(STORAGE_KEY_TRIAL, JSON.stringify(trialPayload));
+    localStorage.setItem(STORAGE_KEY_HEARTBEAT, now.toString());
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Developer Testing Helper: Force trial to expire immediately to test lockout screen
+ */
+export function expireTrialForTesting(): void {
+  const deviceId = getOrCreateDeviceId();
+  const past = Date.now() - 10000;
+  const trialPayload: StoredTrialPayload = {
+    startedAt: past - 24 * 3600 * 1000,
+    durationHours: 24,
+    expiresAt: past,
+    deviceToken: computeDualHash(`TRIAL_EXPIRED:${deviceId}`),
+    source: 'auto_start',
+  };
+  try {
+    localStorage.removeItem(STORAGE_KEY_PRO);
+    localStorage.setItem(STORAGE_KEY_TRIAL, JSON.stringify(trialPayload));
+    localStorage.setItem(STORAGE_KEY_HEARTBEAT, Date.now().toString());
   } catch {
     // ignore
   }
@@ -312,7 +582,7 @@ export function getGeneratedLicenses(): GeneratedLicenseRecord[] {
         {
           key: 'RAHAZA-PRO-LIFETIME-VIP',
           buyerName: 'Master VIP Key (Default)',
-          type: 'universal',
+          type: 'lifetime_universal',
           createdAt: new Date().toISOString(),
         }
       ];
@@ -363,20 +633,18 @@ function hashPin(pin: string): string {
 }
 
 /**
- * Verify Admin PIN (matches stored PIN, default 399339, or EMERGENCY_BYPASS_CODE)
+ * Verify Admin PIN
  */
 export function verifyAdminPin(enteredPin: string): boolean {
   const pin = enteredPin.trim();
   if (!pin) return false;
 
-  // Emergency rescue code always works
   if (pin === EMERGENCY_BYPASS_CODE) {
     return true;
   }
 
   const storedHash = localStorage.getItem(STORAGE_KEY_PIN_HASH);
   if (!storedHash) {
-    // Default PIN: 399339
     return pin === DEFAULT_ADMIN_PIN;
   }
 
@@ -407,10 +675,36 @@ export function changeAdminPin(oldPin: string, newPin: string): { success: boole
 }
 
 /**
+ * Format WhatsApp Message for buyer purchase inquiry
+ */
+export function buildWhatsAppOrderMessage(deviceId: string): string {
+  const text = encodeURIComponent(
+    `Halo Admin Rahaza PWA XML,\n\nSaya ingin membeli Kode Lisensi PRO Lifetime untuk perangkat saya.\n\n📌 Device ID Saya: ${deviceId}\n\nMohon info rekening dan total pembayarannya. Terima kasih!`
+  );
+  return `https://wa.me/${WA_NUMBER}?text=${text}`;
+}
+
+/**
  * Format WhatsApp Message for sending serial key to buyer
  */
 export function buildWhatsAppReplyMessage(record: GeneratedLicenseRecord): string {
-  const deviceNote = record.type === 'device' && record.targetDeviceId
+  if (record.type === 'trial') {
+    const hours = record.trialHours || 24;
+    return `Halo Kak *${record.buyerName}*, berikut adalah Kode Lisensi Trial Anda untuk *Rahaza PWA XML Suite*: ⏱️
+
+🔑 *Kode Trial:* \`${record.key}\`
+⏳ *Masa Aktif:* ${hours} Jam Akses Penuh Fitur PRO
+${record.targetDeviceId ? `🔒 *Device ID:* ${record.targetDeviceId}\n` : ''}
+📌 *Cara Aktivasi Langkah demi Langkah:*
+1. Buka aplikasi Rahaza PWA XML di browser Anda.
+2. Klik tombol *Upgrade PRO* atau menu Aktivasi Lisensi.
+3. Masukkan Kode Trial di atas.
+4. Klik tombol *Aktivasi*. Akses fitur PRO Anda akan langsung aktif selama ${hours} Jam!
+
+Selamat mencoba! 🚀`;
+  }
+
+  const deviceNote = record.type === 'lifetime_device' && record.targetDeviceId
     ? `🔒 *Tipe Lisensi:* Khusus Perangkat (Device ID: ${record.targetDeviceId})\n`
     : `🌟 *Tipe Lisensi:* Universal (Bebas Dipakai di Perangkat Anda)\n`;
 
