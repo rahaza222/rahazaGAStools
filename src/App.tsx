@@ -64,17 +64,17 @@ export default function App() {
   }, []);
 
   const [config, setConfig] = useState<PwaConfig>({
-    url: 'https://script.google.com/macros/s/AKfycbwRMgTWzMfUhkwJSNlV84ecoLJ8w1j79qOIt5GhvWRkrQA7fEfsy5uXanVYqmaGI569CA/exec',
-    name: 'Toko Online Rahaza',
-    shortName: 'TokoApp',
-    desc: 'Katalog belanja online, produk update otomatis dari Google Sheets',
+    url: '',
+    name: '',
+    shortName: '',
+    desc: '',
     themeColor: '#2563EB',
     bgColor: '#0F172A',
     display: 'standalone',
     orientation: 'portrait-primary',
     iconType: 'text',
     iconUrl: '',
-    iconText: 'TO',
+    iconText: '',
     icon192Src: null,
     icon512Src: null,
     permissions: {

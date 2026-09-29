@@ -23,7 +23,8 @@ export function HomeScreenIconPreview({ config, onDownloadAsset }: HomeScreenIco
     if (config.iconType === 'image' && config.icon192Src) {
       return { src: config.icon192Src, type: 'image', label: 'WebP Upload (192×192)' };
     }
-    const svg = createSVGString(192, config.bgColor, config.themeColor, config.iconText || '?');
+    const defaultInitial = config.shortName ? config.shortName.slice(0, 2).toUpperCase() : (config.name ? config.name.slice(0, 2).toUpperCase() : 'AP');
+    const svg = createSVGString(192, config.bgColor, config.themeColor, config.iconText || defaultInitial);
     const b64 = `data:image/svg+xml;base64,${base64EncodeSafe(svg)}`;
     return { src: b64, type: 'text', label: 'SVG Vector Inisial' };
   };

@@ -95,20 +95,23 @@ export function PwaGenerator({
     let icon512 = '';
     let mimeType = 'image/png';
 
+    const defaultInitial = config.shortName ? config.shortName.slice(0, 2).toUpperCase() : (config.name ? config.name.slice(0, 2).toUpperCase() : 'AP');
+    const activeIconText = config.iconText || defaultInitial;
+
     if (config.iconType === 'url') {
       if (config.iconUrl) {
         icon192 = config.iconUrl;
         icon512 = config.iconUrl;
       } else {
-        const svg = createSVGString(192, config.bgColor, config.themeColor, config.iconText || '?');
+        const svg = createSVGString(192, config.bgColor, config.themeColor, activeIconText);
         const b64 = `data:image/svg+xml;base64,${base64EncodeSafe(svg)}`;
         icon192 = b64;
         icon512 = b64;
         mimeType = 'image/svg+xml';
       }
     } else if (config.iconType === 'text') {
-      icon192 = `data:image/svg+xml;base64,${base64EncodeSafe(createSVGString(192, config.bgColor, config.themeColor, config.iconText || '?'))}`;
-      icon512 = `data:image/svg+xml;base64,${base64EncodeSafe(createSVGString(512, config.bgColor, config.themeColor, config.iconText || '?'))}`;
+      icon192 = `data:image/svg+xml;base64,${base64EncodeSafe(createSVGString(192, config.bgColor, config.themeColor, activeIconText))}`;
+      icon512 = `data:image/svg+xml;base64,${base64EncodeSafe(createSVGString(512, config.bgColor, config.themeColor, activeIconText))}`;
       mimeType = 'image/svg+xml';
     } else if (config.iconType === 'image') {
       if (config.icon192Src && config.icon512Src) {
@@ -116,7 +119,7 @@ export function PwaGenerator({
         icon512 = config.icon512Src;
         mimeType = 'image/webp';
       } else {
-        const svg = createSVGString(192, config.bgColor, config.themeColor, '?');
+        const svg = createSVGString(192, config.bgColor, config.themeColor, activeIconText);
         const b64 = `data:image/svg+xml;base64,${base64EncodeSafe(svg)}`;
         icon192 = b64;
         icon512 = b64;
@@ -804,6 +807,30 @@ ${!isPro ? `
     document.body.removeChild(a);
   };
 
+  const loadExampleData = () => {
+    setConfig(prev => ({
+      ...prev,
+      url: 'https://script.google.com/macros/s/AKfycbwRMgTWzMfUhkwJSNlV84ecoLJ8w1j79qOIt5GhvWRkrQA7fEfsy5uXanVYqmaGI569CA/exec',
+      name: 'Toko Online Rahaza',
+      shortName: 'TokoApp',
+      desc: 'Katalog belanja online, produk update otomatis dari Google Sheets',
+      iconText: 'TO',
+    }));
+  };
+
+  const clearFormData = () => {
+    setConfig(prev => ({
+      ...prev,
+      url: '',
+      name: '',
+      shortName: '',
+      desc: '',
+      iconText: '',
+      icon192Src: null,
+      icon512Src: null,
+    }));
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
       {/* PWA Verification & Install Support Banner */}
@@ -915,12 +942,32 @@ ${!isPro ? `
         {/* Left: Configuration Form */}
         <div className="xl:col-span-6 flex flex-col space-y-6">
           <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-6">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+            <div className="flex flex-wrap items-center justify-between border-b border-gray-100 pb-4 gap-2">
               <h4 className="text-xs font-bold tracking-widest text-gray-900 uppercase flex items-center gap-2">
                 <SlidersHorizontal className="text-blue-600 w-4 h-4" />
                 Konfigurasi PWA WebApp
               </h4>
-              <span className="text-[10px] font-mono text-gray-400">BLOGGER XML V3</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={loadExampleData}
+                  className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                  title="Isi formulir dengan contoh data demo"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>Isi Contoh Demo</span>
+                </button>
+                {(config.url || config.name || config.shortName || config.desc) && (
+                  <button
+                    type="button"
+                    onClick={clearFormData}
+                    className="text-[11px] font-medium text-gray-500 hover:text-red-600 bg-gray-100 hover:bg-red-50 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                    title="Kosongkan semua input"
+                  >
+                    Kosongkan Form
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* URL */}
@@ -995,7 +1042,7 @@ ${!isPro ? `
                   value={config.name}
                   onChange={e => setConfig({ ...config, name: e.target.value })}
                   className="w-full border border-gray-200 bg-gray-50 text-gray-900 px-3 py-2 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-xs transition-colors"
-                  placeholder="Contoh: Toko Online Rahaza"
+                  placeholder="Contoh: Toko Online Saya (atau nama aplikasi Anda)"
                 />
               </div>
               <div>
@@ -1008,7 +1055,7 @@ ${!isPro ? `
                   maxLength={12}
                   onChange={e => setConfig({ ...config, shortName: e.target.value })}
                   className="w-full border border-gray-200 bg-gray-50 text-gray-900 px-3 py-2 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-xs transition-colors"
-                  placeholder="Maks 12 huruf"
+                  placeholder="Contoh: TokoApp (Maks 12 huruf)"
                 />
               </div>
             </div>
@@ -1023,7 +1070,7 @@ ${!isPro ? `
                 value={config.desc}
                 onChange={e => setConfig({ ...config, desc: e.target.value })}
                 className="w-full border border-gray-200 bg-gray-50 text-gray-900 px-3 py-2 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-xs transition-colors"
-                placeholder="Penjelasan ringkas mengenai fungsi aplikasi"
+                placeholder="Contoh: Katalog belanja online, produk update otomatis dari Google Sheets"
               />
             </div>
 
@@ -1219,7 +1266,8 @@ ${!isPro ? `
                     maxLength={2}
                     value={config.iconText}
                     onChange={e => setConfig({ ...config, iconText: e.target.value.toUpperCase() })}
-                    className="w-20 text-center font-bold text-lg border border-gray-300 bg-white text-gray-900 py-1.5 rounded-lg focus:outline-none focus:border-blue-500 uppercase"
+                    className="w-20 text-center font-bold text-lg border border-gray-300 bg-white text-gray-900 py-1.5 rounded-lg focus:outline-none focus:border-blue-500 uppercase placeholder:text-gray-300"
+                    placeholder={config.shortName ? config.shortName.slice(0, 2).toUpperCase() : (config.name ? config.name.slice(0, 2).toUpperCase() : 'AP')}
                   />
                 </div>
               )}

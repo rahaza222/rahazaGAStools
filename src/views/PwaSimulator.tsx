@@ -27,7 +27,8 @@ export function PwaSimulator({
   const getIconSrc = () => {
     if (config.iconType === 'url' && config.iconUrl) return config.iconUrl;
     if (config.iconType === 'image' && config.icon192Src) return config.icon192Src;
-    const svg = createSVGString(192, config.bgColor, config.themeColor, config.iconText || '?');
+    const defaultInitial = config.shortName ? config.shortName.slice(0, 2).toUpperCase() : (config.name ? config.name.slice(0, 2).toUpperCase() : 'AP');
+    const svg = createSVGString(192, config.bgColor, config.themeColor, config.iconText || defaultInitial);
     return `data:image/svg+xml;base64,${base64EncodeSafe(svg)}`;
   };
 
