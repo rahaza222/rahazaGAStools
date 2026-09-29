@@ -725,8 +725,7 @@ ${!isPro ? `
 
   const handleCopy = () => {
     if (!isPro && outputTab === 'xml') {
-      setPendingExportAction('copy');
-      setIsFreeExportWarningOpen(true);
+      onOpenUpgradeModal?.();
       return;
     }
     executeCopy();
@@ -758,8 +757,7 @@ ${!isPro ? `
 
   const handleDownloadXML = () => {
     if (!isPro) {
-      setPendingExportAction('download_xml');
-      setIsFreeExportWarningOpen(true);
+      onOpenUpgradeModal?.();
       return;
     }
     executeDownloadXML();
@@ -1390,25 +1388,41 @@ ${!isPro ? `
                   <button
                     onClick={handleCopy}
                     className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                      copied
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
+                      !isPro && outputTab === 'xml'
+                        ? 'bg-amber-50 border-amber-300 text-amber-900 hover:bg-amber-100 shadow-2xs'
+                        : copied
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                          : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
                     }`}
                   >
-                    {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                    {copied ? 'TERSALIN' : 'SALIN KODE'}
+                    {!isPro && outputTab === 'xml' ? (
+                      <>
+                        <Lock className="w-3.5 h-3.5 text-amber-700" />
+                        <span>SALIN KODE (PRO)</span>
+                      </>
+                    ) : copied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>TERSALIN</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>SALIN KODE</span>
+                      </>
+                    )}
                   </button>
                   {outputTab === 'xml' ? (
                     <button
                       onClick={handleDownloadXML}
                       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-white text-xs font-bold transition-all shadow-xs cursor-pointer ${
-                        isPro 
-                          ? 'bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800' 
-                          : 'bg-blue-600 hover:bg-blue-700'
+                        !isPro
+                          ? 'bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800'
+                          : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700'
                       }`}
                     >
-                      <Download className="w-3.5 h-3.5" />
-                      {isPro ? 'DOWNLOAD XML (PRO)' : 'DOWNLOAD XML'}
+                      {!isPro ? <Lock className="w-3.5 h-3.5" /> : <Download className="w-3.5 h-3.5" />}
+                      <span>{!isPro ? 'DOWNLOAD XML (PRO)' : 'DOWNLOAD XML'}</span>
                     </button>
                   ) : (
                     <button
@@ -1416,7 +1430,7 @@ ${!isPro ? `
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors shadow-xs cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      DOWNLOAD JSON
+                      <span>DOWNLOAD JSON</span>
                     </button>
                   )}
                 </div>
@@ -1521,9 +1535,9 @@ ${!isPro ? `
                     {!isPro ? (
                       <div className="bg-amber-950/70 border-t border-amber-800/50 p-2.5 px-4 text-xs text-amber-200 flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                          <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                           <span className="text-[11px] text-amber-100">
-                            <strong>Watermark Layar Aktif:</strong> WebApp akan menampilkan badge <em>&ldquo;Powered by RAHAZA DIGITAL (FREE)&rdquo;</em>.
+                            <strong>Akses Kode Terkunci:</strong> Fitur Salin Kode &amp; Download XML hanya tersedia di versi PRO.
                           </span>
                         </div>
                         <button
@@ -1532,22 +1546,106 @@ ${!isPro ? `
                           className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-[10px] rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
                         >
                           <Crown className="w-3 h-3" />
-                          <span>Hapus Watermark (Beli PRO)</span>
+                          <span>Aktivasi PRO (Rp 15.000)</span>
                         </button>
                       </div>
                     ) : (
                       <div className="bg-emerald-950/60 border-t border-emerald-800/40 p-2 px-4 text-[11px] text-emerald-300 flex items-center gap-2">
                         <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                        <span><strong>100% White-Label:</strong> Lisensi PRO aktif. XML bersih tanpa watermark RAHAZA DIGITAL.</span>
+                        <span><strong>100% White-Label:</strong> Lisensi PRO aktif. XML bersih tanpa watermark &amp; siap di-copy.</span>
                       </div>
                     )}
                   </div>
                 )}
-                <div className="flex-1 p-4 overflow-hidden flex flex-col">
+                <div className="flex-1 p-4 overflow-hidden flex flex-col relative">
+                  {/* Frosted Glass Hard Paywall Overlay for Free Mode */}
+                  {!isPro && outputTab === 'xml' && (
+                    <div 
+                      className="absolute inset-0 bg-slate-950/85 backdrop-blur-md z-30 flex flex-col items-center justify-center p-6 text-center select-none"
+                      onContextMenu={e => e.preventDefault()}
+                      onCopy={e => { e.preventDefault(); onOpenUpgradeModal?.(); }}
+                    >
+                      <div className="max-w-md w-full bg-slate-900/95 border border-amber-500/40 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
+                        <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-400/40 text-amber-400 flex items-center justify-center mx-auto shadow-lg">
+                          <Lock className="w-7 h-7" />
+                        </div>
+                        
+                        <div>
+                          <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                            Proteksi Hak Cipta &amp; Lisensi
+                          </span>
+                          <h3 className="text-base font-extrabold text-white mt-2">
+                            Kode Template XML Blogger Terkunci
+                          </h3>
+                          <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
+                            Fitur <strong>Salin Kode</strong>, <strong>Download File XML</strong>, dan seleksi teks dinonaktifkan di versi Free.
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-slate-950/70 rounded-xl border border-slate-800 text-[11px] text-slate-300 text-left space-y-1.5">
+                          <div className="flex items-center gap-2 text-emerald-400 font-semibold">
+                            <Check className="w-3.5 h-3.5 shrink-0" />
+                            <span>Buka 100% Kode XML Siap Pakai di Blogger</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-emerald-400 font-semibold">
+                            <Check className="w-3.5 h-3.5 shrink-0" />
+                            <span>Bebas Watermark &amp; 100% White-Label</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-emerald-400 font-semibold">
+                            <Check className="w-3.5 h-3.5 shrink-0" />
+                            <span>Lisensi Permanen Sekali Bayar (Promo Rp 15.000)</span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={onOpenUpgradeModal}
+                          className="w-full py-3 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-800 text-white font-extrabold text-xs rounded-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <Crown className="w-4 h-4" />
+                          <span>Buka Kunci Kode XML (Beli Lisensi PRO)</span>
+                        </button>
+
+                        <p className="text-[10px] text-slate-400">
+                          Anda tetap bisa menguji tampilan dan fitur tombol di tab <strong>Simulator PWA</strong>.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   <textarea
-                    className="w-full flex-1 bg-transparent text-emerald-400 font-mono text-[11px] leading-relaxed border-0 focus:outline-none focus:ring-0 resize-none selection:bg-blue-900 selection:text-white"
+                    className={`w-full flex-1 bg-transparent text-emerald-400 font-mono text-[11px] leading-relaxed border-0 focus:outline-none focus:ring-0 resize-none ${
+                      !isPro && outputTab === 'xml'
+                        ? 'select-none pointer-events-none filter blur-[4px] opacity-20'
+                        : 'selection:bg-blue-900 selection:text-white'
+                    }`}
                     readOnly
-                    value={outputTab === 'xml' ? xmlOutput : manifestOutput}
+                    tabIndex={!isPro && outputTab === 'xml' ? -1 : 0}
+                    onContextMenu={e => {
+                      if (!isPro && outputTab === 'xml') {
+                        e.preventDefault();
+                        onOpenUpgradeModal?.();
+                      }
+                    }}
+                    onCopy={e => {
+                      if (!isPro && outputTab === 'xml') {
+                        e.preventDefault();
+                        onOpenUpgradeModal?.();
+                      }
+                    }}
+                    onKeyDown={e => {
+                      if (!isPro && outputTab === 'xml' && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        onOpenUpgradeModal?.();
+                      }
+                    }}
+                    value={
+                      outputTab === 'manifest'
+                        ? manifestOutput
+                        : isPro
+                          ? xmlOutput
+                          : `<?xml version="1.0" encoding="UTF-8" ?>\n<!-- 🔒 KODE TEMPLATE XML BLOGGER TERKUNCI -->\n<!-- Beli Lisensi PRO Lifetime untuk Membuka Akses Salin & Download -->\n<!-- WhatsApp: 6281911934000 -->\n<!DOCTYPE html>\n<html b:css='false'>\n<head>\n  <!-- [LOCKED - AKTIFKAN LISENSI PRO UNTUK MELIHAT SELURUH KODE] -->\n</head>\n<body>\n  <!-- KONTEN TERKUNCI -->\n</body>\n</html>`
+                    }
                     placeholder="Template code will be generated here..."
                   />
                 </div>
@@ -1557,17 +1655,26 @@ ${!isPro ? `
             {/* Bottom Status / Instructions Bar */}
             <div className="p-3 bg-gray-50 border-t border-gray-200 text-[11px] text-gray-600 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <span className="flex items-center gap-1 text-gray-500">
-                <Check className="w-3.5 h-3.5 text-green-500 shrink-0" />
-                Siap di-paste ke Blogger &gt; Tema &gt; Edit HTML
+                {isPro || outputTab !== 'xml' ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                    <span>Siap di-paste ke Blogger &gt; Tema &gt; Edit HTML</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span className="text-amber-800 font-semibold">Akses XML Terkunci • Aktifkan Lisensi PRO untuk Ekspor ke Blogger</span>
+                  </>
+                )}
               </span>
               <div className="flex items-center gap-2">
                 <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
                   isPro ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-gray-200 text-gray-700'
                 }`}>
-                  {isPro ? '👑 PRO White-Label' : 'Free Edition'}
+                  {isPro ? '👑 PRO White-Label' : 'Free Edition (Terkunci)'}
                 </span>
                 <span className="text-[10px] text-gray-400 font-mono">
-                  {outputTab === 'xml' ? 'Format: Blogger XML Theme (PWA Ready)' : outputTab === 'manifest' ? 'Format: W3C WebApp Manifest' : 'Status: 100% PWA Compliant'}
+                  {outputTab === 'xml' ? 'Format: Blogger XML Theme' : outputTab === 'manifest' ? 'Format: W3C WebApp Manifest' : 'Status: 100% PWA Compliant'}
                 </span>
               </div>
             </div>
