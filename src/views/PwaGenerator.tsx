@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   AppWindow, SlidersHorizontal, Link as LinkIcon, Download, Copy, Check, 
   ExternalLink, Smartphone, CheckCircle2, ShieldCheck, DownloadCloud,
-  Layers, Info, ArrowUpRight, Sparkles, AlertTriangle, Wand2, Crown
+  Layers, Info, ArrowUpRight, Sparkles, AlertTriangle, Wand2, Crown,
+  ShieldAlert, Lock, X
 } from 'lucide-react';
 import { PwaConfig, PwaPermissions } from '../types';
 import { base64EncodeSafe, createSVGString, getKbSize } from '../lib/utils';
@@ -30,6 +31,8 @@ export function PwaGenerator({
   const [kbSize, setKbSize] = useState('0');
   const [copied, setCopied] = useState(false);
   const [isPatcherOpen, setIsPatcherOpen] = useState(false);
+  const [isFreeExportWarningOpen, setIsFreeExportWarningOpen] = useState(false);
+  const [pendingExportAction, setPendingExportAction] = useState<'copy' | 'download_xml' | 'download_manifest' | null>(null);
 
   // Handle local image upload with canvas resizing
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -391,6 +394,60 @@ ${licenseComment}
       from { transform: translateY(100%); }
       to { transform: translateY(0); }
     }
+${!isPro ? `
+    /* Free Edition Floating Watermark - Powered by RAHAZA DIGITAL */
+    #rahaza-watermark {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 99990;
+      pointer-events: auto;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    #rahaza-watermark a {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(15, 23, 42, 0.90);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: #ffffff;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 500;
+      text-decoration: none;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+      transition: transform 0.2s, background 0.2s;
+    }
+    #rahaza-watermark a:hover {
+      background: rgba(15, 23, 42, 0.98);
+      transform: translateY(-1px);
+    }
+    #rahaza-watermark .rw-dot {
+      width: 6px;
+      height: 6px;
+      background: #38bdf8;
+      border-radius: 50%;
+      box-shadow: 0 0 6px #38bdf8;
+    }
+    #rahaza-watermark .rw-text strong {
+      color: #38bdf8;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+    #rahaza-watermark .rw-tag {
+      background: rgba(244, 63, 94, 0.25);
+      color: #fda4af;
+      border: 1px solid rgba(244, 63, 94, 0.5);
+      font-size: 9px;
+      font-weight: 800;
+      padding: 1px 5px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+    }
+` : ''}
   ]]></b:skin>
 </head>
 <body>
@@ -404,6 +461,17 @@ ${licenseComment}
   <div id='app-container'>
     <iframe allow='${allowAttr}' id='gas-frame' src='${config.url || '#'}'/>
   </div>
+
+  ${!isPro ? `
+  <!-- Free Edition On-Screen Watermark (Beli Lisensi PRO Rahaza untuk Menghapusnya) -->
+  <div id='rahaza-watermark'>
+    <a href='https://wa.me/6281911934000?text=Halo%20Admin%20Rahaza%20Digital%2C%20saya%20ingin%20beli%20Lisensi%20PRO%20untuk%20hapus%20watermark' rel='noopener noreferrer' target='_blank' title='Dibuat dengan Rahaza Digital - Klik untuk Upgrade PRO'>
+      <span class='rw-dot'/>
+      <span class='rw-text'>Powered by <strong>RAHAZA DIGITAL</strong></span>
+      <span class='rw-tag'>FREE</span>
+    </a>
+  </div>
+  ` : ''}
 
   ${config.enableInstallPrompt ? `
   <!-- In-App Floating Install Banner -->
@@ -527,6 +595,97 @@ ${licenseComment}
         deferredPrompt = null;
       });
     }
+
+${!isPro ? `
+    // ========================================================
+    // 🛡️ RAHAZA DIGITAL - ANTI-TAMPER & WATERMARK GUARDIAN
+    // ========================================================
+    (function() {
+      var isTriggered = false;
+
+      function activateLicenseWall() {
+        if (isTriggered) return;
+        isTriggered = true;
+
+        var frame = document.getElementById('gas-frame');
+        if (frame) {
+          try { frame.src = 'about:blank'; } catch(e){}
+          frame.style.display = 'none';
+        }
+
+        var old = document.getElementById('rahaza-license-wall');
+        if (old && old.parentNode) old.parentNode.removeChild(old);
+
+        var wall = document.createElement('div');
+        wall.id = 'rahaza-license-wall';
+        wall.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:#090d16;color:#ffffff;z-index:9999999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
+
+        wall.innerHTML = '<div style="max-width:440px;width:100%;background:#131c2e;border:1px solid #ef4444;border-radius:24px;padding:32px 24px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.8);">'
+          + '<div style="width:60px;height:60px;margin:0 auto 16px auto;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:26px;">⚠️</div>'
+          + '<h2 style="font-size:18px;font-weight:800;color:#f87171;margin:0 0 10px 0;letter-spacing:0.3px;">PERINGATAN LISENSI RESMI</h2>'
+          + '<p style="font-size:13px;color:#cbd5e1;line-height:1.6;margin:0 0 18px 0;">Watermark <strong>RAHAZA DIGITAL</strong> pada template ini telah dihapus atau disembunyikan tanpa lisensi resmi.</p>'
+          + '<div style="background:#0b1120;border-radius:14px;padding:12px 14px;margin-bottom:22px;text-align:left;font-size:11px;color:#94a3b8;border:1px solid #1e293b;line-height:1.5;">'
+          + '🔒 <strong>Ketentuan:</strong> Versi Gratis wajib menampilkan watermark mengambang. Untuk menghapus watermark dan menggunakan versi <strong>100% White-Label</strong>, silakan aktifkan Lisensi PRO resmi seumur hidup.'
+          + '</div>'
+          + '<a href="https://wa.me/6281911934000?text=Halo%20Admin%20Rahaza%2C%20saya%20ingin%20beli%20Lisensi%20PRO%20Lifetime%20untuk%20menghapus%20watermark" target="_blank" rel="noopener noreferrer" style="display:inline-block;width:100%;box-sizing:border-box;background:#2563eb;color:#ffffff;font-size:13px;font-weight:700;padding:13px 20px;border-radius:14px;text-decoration:none;box-shadow:0 10px 20px rgba(37,99,235,0.3);">'
+          + 'Beli Lisensi PRO via WhatsApp</a>'
+          + '</div>';
+
+        document.body.appendChild(wall);
+      }
+
+      function checkWatermarkIntegrity() {
+        var wm = document.getElementById('rahaza-watermark');
+        if (!wm) {
+          activateLicenseWall();
+          return;
+        }
+
+        try {
+          var s = window.getComputedStyle(wm);
+          if (s.display === 'none' || s.visibility === 'hidden' || parseFloat(s.opacity || '1') < 0.2) {
+            activateLicenseWall();
+            return;
+          }
+          if (wm.offsetWidth <= 0 || wm.offsetHeight <= 0) {
+            activateLicenseWall();
+            return;
+          }
+        } catch(e) {}
+
+        var txt = (wm.textContent || wm.innerText || '').toUpperCase();
+        if (txt.indexOf('RAHAZA') === -1 || txt.indexOf('DIGITAL') === -1) {
+          activateLicenseWall();
+          return;
+        }
+
+        var link = wm.querySelector('a');
+        if (!link || !link.href || link.href.indexOf('6281911934000') === -1) {
+          activateLicenseWall();
+          return;
+        }
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', checkWatermarkIntegrity);
+      } else {
+        checkWatermarkIntegrity();
+      }
+      window.addEventListener('load', checkWatermarkIntegrity);
+      setInterval(checkWatermarkIntegrity, 2500);
+
+      if (typeof MutationObserver !== 'undefined') {
+        var obs = new MutationObserver(function() {
+          checkWatermarkIntegrity();
+        });
+        obs.observe(document.documentElement, {
+          childList: true,
+          subtree: true,
+          attributes: true
+        });
+      }
+    })();
+` : ''}
     //]]>
   </script>
 
@@ -539,9 +698,38 @@ ${licenseComment}
 
     setXmlOutput(xmlTemplate);
     setKbSize(getKbSize(xmlTemplate));
-  }, [config]);
+  }, [config, isPro]);
 
-  const downloadXML = () => {
+  const executeCopy = () => {
+    const textToCopy = outputTab === 'xml' ? xmlOutput : manifestOutput;
+    try {
+      if (typeof window !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(textToCopy);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = textToCopy;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleCopy = () => {
+    if (!isPro && outputTab === 'xml') {
+      setPendingExportAction('copy');
+      setIsFreeExportWarningOpen(true);
+      return;
+    }
+    executeCopy();
+  };
+
+  const executeDownloadXML = () => {
     const fileName = `theme-${(config.shortName || 'app').toLowerCase().replace(/[^a-z0-9]/g, '-')}.xml`;
     try {
       const blob = new Blob([xmlOutput], { type: 'text/xml;charset=utf-8' });
@@ -565,7 +753,16 @@ ${licenseComment}
     }
   };
 
-  const downloadManifest = () => {
+  const handleDownloadXML = () => {
+    if (!isPro) {
+      setPendingExportAction('download_xml');
+      setIsFreeExportWarningOpen(true);
+      return;
+    }
+    executeDownloadXML();
+  };
+
+  const executeDownloadManifest = () => {
     const fileName = `manifest.json`;
     try {
       const blob = new Blob([manifestOutput], { type: 'application/json;charset=utf-8' });
@@ -589,6 +786,10 @@ ${licenseComment}
     }
   };
 
+  const handleDownloadManifest = () => {
+    executeDownloadManifest();
+  };
+
   const downloadIconAsset = (size: 192 | 512) => {
     const src = size === 192 ? config.icon192Src : config.icon512Src;
     if (!src) {
@@ -601,13 +802,6 @@ ${licenseComment}
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-  };
-
-  const handleCopy = () => {
-    const textToCopy = outputTab === 'xml' ? xmlOutput : manifestOutput;
-    navigator.clipboard.writeText(textToCopy);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -1158,15 +1352,19 @@ ${licenseComment}
                   </button>
                   {outputTab === 'xml' ? (
                     <button
-                      onClick={downloadXML}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors shadow-xs cursor-pointer"
+                      onClick={handleDownloadXML}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-white text-xs font-bold transition-all shadow-xs cursor-pointer ${
+                        isPro 
+                          ? 'bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800' 
+                          : 'bg-blue-600 hover:bg-blue-700'
+                      }`}
                     >
                       <Download className="w-3.5 h-3.5" />
-                      DOWNLOAD XML
+                      {isPro ? 'DOWNLOAD XML (PRO)' : 'DOWNLOAD XML'}
                     </button>
                   ) : (
                     <button
-                      onClick={downloadManifest}
+                      onClick={handleDownloadManifest}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors shadow-xs cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" />
@@ -1263,12 +1461,38 @@ ${licenseComment}
                     </div>
                   </div>
                 ) : (
-                  <div className="bg-slate-900 border-b border-slate-800 p-2.5 px-4 text-xs text-emerald-400 flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span className="text-[11px]"><strong>All-In-One:</strong> Cukup salin kode XML ini ke Blogger &gt; Tema &gt; Edit HTML.</span>
-                    </span>
-                    <span className="text-[10px] text-slate-400 hidden sm:inline">Otomatis Termasuk Manifest + Ikon + Tombol Install</span>
+                  <div className="flex flex-col border-b border-slate-800">
+                    <div className="bg-slate-900 p-2.5 px-4 text-xs text-emerald-400 flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span className="text-[11px]"><strong>All-In-One:</strong> Cukup salin kode XML ini ke Blogger &gt; Tema &gt; Edit HTML.</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400 hidden sm:inline">Otomatis Termasuk Manifest + Ikon + Tombol Install</span>
+                    </div>
+
+                    {!isPro ? (
+                      <div className="bg-amber-950/70 border-t border-amber-800/50 p-2.5 px-4 text-xs text-amber-200 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                          <span className="text-[11px] text-amber-100">
+                            <strong>Watermark Layar Aktif:</strong> WebApp akan menampilkan badge <em>&ldquo;Powered by RAHAZA DIGITAL (FREE)&rdquo;</em>.
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={onOpenUpgradeModal}
+                          className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-[10px] rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
+                        >
+                          <Crown className="w-3 h-3" />
+                          <span>Hapus Watermark (Beli PRO)</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="bg-emerald-950/60 border-t border-emerald-800/40 p-2 px-4 text-[11px] text-emerald-300 flex items-center gap-2">
+                        <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span><strong>100% White-Label:</strong> Lisensi PRO aktif. XML bersih tanpa watermark RAHAZA DIGITAL.</span>
+                      </div>
+                    )}
                   </div>
                 )}
                 <div className="flex-1 p-4 overflow-hidden flex flex-col">
@@ -1305,6 +1529,103 @@ ${licenseComment}
 
       {/* Code.gs ALLOWALL Auto-Patcher Modal */}
       <GasPatcherModal isOpen={isPatcherOpen} onClose={() => setIsPatcherOpen(false)} />
+
+      {/* Free Edition Export & Anti-Tamper Warning Modal */}
+      {isFreeExportWarningOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={() => setIsFreeExportWarningOpen(false)}
+        >
+          <div 
+            className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-gray-200 overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 p-5 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white shrink-0">
+                  <ShieldAlert className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-white">
+                    Pemberitahuan Ekspor Template Versi Free
+                  </h3>
+                  <p className="text-[11px] text-amber-100 mt-0.5">
+                    Watermark &amp; Proteksi Anti-Hapus Aktif
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsFreeExportWarningOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4 text-xs text-gray-700">
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl space-y-2">
+                <div className="font-bold text-amber-950 flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Yang Perlu Anda Ketahui Sebelum Memasang ke Blogger:</span>
+                </div>
+                <ul className="space-y-1.5 text-amber-900 text-[11px] list-disc pl-4 leading-relaxed">
+                  <li>
+                    <strong>Watermark Mengambang:</strong> Di layar WebApp Anda akan tampil badge mengambang <em>&ldquo;Powered by RAHAZA DIGITAL (FREE)&rdquo;</em>.
+                  </li>
+                  <li>
+                    <strong>Anti-Tamper Guardian Aktif:</strong> Script template memantau watermark secara otomatis. Jika kode watermark dihapus manual di Blogger, <strong>WebApp akan otomatis terkunci</strong> dan menampilkan peringatan lisensi.
+                  </li>
+                </ul>
+              </div>
+
+              <div className="p-3.5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl space-y-1.5">
+                <div className="font-extrabold text-blue-950 flex items-center gap-1.5">
+                  <Crown className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Ingin Bebas Watermark (100% White-Label)?</span>
+                </div>
+                <p className="text-[11px] text-blue-800 leading-relaxed">
+                  Dapatkan <strong>Lisensi PRO Lifetime (Promo Rp 15.000 Sekali Bayar)</strong> untuk menghapus semua watermark, bebas kredit, dan aman untuk klien/bisnis resmi Anda.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsFreeExportWarningOpen(false);
+                    onOpenUpgradeModal?.();
+                  }}
+                  className="w-full py-3 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-800 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Crown className="w-4 h-4" />
+                  <span>Beli Lisensi PRO Sekarang (Rp 15.000 Lifetime)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsFreeExportWarningOpen(false);
+                    if (pendingExportAction === 'copy') {
+                      executeCopy();
+                    } else if (pendingExportAction === 'download_xml') {
+                      executeDownloadXML();
+                    } else if (pendingExportAction === 'download_manifest') {
+                      executeDownloadManifest();
+                    }
+                  }}
+                  className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition-colors cursor-pointer text-center"
+                >
+                  Tetap {pendingExportAction === 'copy' ? 'Salin Kode' : 'Download File'} Versi Free (Watermark Aktif)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

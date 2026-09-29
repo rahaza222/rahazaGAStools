@@ -5,9 +5,15 @@ import { createSVGString, base64EncodeSafe } from '../lib/utils';
 
 interface PwaSimulatorProps {
   config: PwaConfig;
+  isPro?: boolean;
+  onOpenUpgradeModal?: () => void;
 }
 
-export function PwaSimulator({ config }: PwaSimulatorProps) {
+export function PwaSimulator({ 
+  config,
+  isPro = false,
+  onOpenUpgradeModal
+}: PwaSimulatorProps) {
   const [deviceMode, setDeviceMode] = useState<'iphone' | 'android'>('android');
   const [previewTab, setPreviewTab] = useState<'app' | 'homescreen' | 'splash'>('app');
   const [key, setKey] = useState(0);
@@ -123,6 +129,41 @@ export function PwaSimulator({ config }: PwaSimulatorProps) {
         </div>
       </div>
 
+      {/* Watermark Status Alert */}
+      {!isPro ? (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-start gap-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 mt-1 shrink-0 animate-ping" />
+            <div className="text-xs text-amber-950">
+              <span className="font-extrabold block text-amber-900">
+                Mode Gratis Aktif: Watermark Layar &quot;RAHAZA DIGITAL&quot; Terpasang
+              </span>
+              <span className="text-amber-800 text-[11px] leading-relaxed">
+                Di layar simulator HP di bawah, terdapat lencana mengambang <strong>&ldquo;Powered by RAHAZA DIGITAL (FREE)&rdquo;</strong>. Pengunjung webapp Anda akan melihat lencana ini kecuali Anda membeli lisensi PRO.
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenUpgradeModal}
+            className="px-3.5 py-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-extrabold text-xs rounded-xl shadow-xs transition-transform active:scale-95 shrink-0 flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Hapus Watermark (Beli PRO)</span>
+          </button>
+        </div>
+      ) : (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 flex items-center justify-between text-xs text-emerald-950 shadow-xs">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span><strong>100% White-Label (PRO Lifetime):</strong> Layar WebApp Anda bersih tanpa watermark RAHAZA DIGITAL.</span>
+          </div>
+          <span className="bg-emerald-100 text-emerald-800 font-extrabold text-[10px] px-2.5 py-0.5 rounded-full uppercase">
+            PRO AKTIF
+          </span>
+        </div>
+      )}
+
       {/* Simulator Device Frame */}
       <div className="flex flex-col items-center justify-center py-2">
         <div
@@ -179,6 +220,22 @@ export function PwaSimulator({ config }: PwaSimulatorProps) {
                       <div className="text-blue-400 font-bold uppercase tracking-wider text-[9px]">Status Pratinjau</div>
                       <div>Isi URL Google Apps Script yang valid pada tab Generator untuk memuat WebApp langsung di sini.</div>
                     </div>
+                  </div>
+                )}
+
+                {/* Simulated Floating Watermark inside phone screen for Free tier */}
+                {!isPro && (
+                  <div className="absolute top-9 right-2.5 z-40 animate-in fade-in duration-300">
+                    <button
+                      type="button"
+                      onClick={onOpenUpgradeModal}
+                      title="Watermark Versi Gratis - Klik untuk Hapus (Beli PRO)"
+                      className="inline-flex items-center gap-1.5 bg-slate-950/90 hover:bg-slate-900 backdrop-blur-md text-white text-[9px] font-medium px-2.5 py-1 rounded-full border border-white/20 shadow-xl cursor-pointer transition-transform hover:scale-105 active:scale-95"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#38bdf8] animate-pulse" />
+                      <span>Powered by <strong className="text-cyan-300 font-bold">RAHAZA DIGITAL</strong></span>
+                      <span className="bg-rose-500/30 text-rose-300 text-[8px] font-black px-1 py-0.2 rounded border border-rose-500/40">FREE</span>
+                    </button>
                   </div>
                 )}
 

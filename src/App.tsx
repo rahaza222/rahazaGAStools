@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { PwaGenerator } from './views/PwaGenerator';
 import { PwaSimulator } from './views/PwaSimulator';
@@ -17,6 +17,51 @@ export default function App() {
   const refreshLicense = () => {
     setLicenseStatus(getCurrentLicenseStatus());
   };
+
+  // 🚪 3 Cara Membuka Portal Rahasia Admin:
+  // 1. Shortcut Keyboard (Ctrl + Shift + A atau Cmd + Shift + A)
+  // 2. URL Query (?admin=portal atau ?secret=rahaza)
+  // 3. URL Hash (#admin atau #keygen)
+  useEffect(() => {
+    // 1. Keyboard shortcut listener
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        setIsAdminModalOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    // 2. Check URL Query Parameters & 3. Check URL Hash
+    const checkSecretUrlTriggers = () => {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const adminParam = urlParams.get('admin');
+        const secretParam = urlParams.get('secret');
+        const hash = window.location.hash.toLowerCase();
+
+        if (
+          adminParam === 'portal' ||
+          secretParam === 'rahaza' ||
+          secretParam === 'artaqu' ||
+          hash === '#admin' ||
+          hash === '#keygen'
+        ) {
+          setIsAdminModalOpen(true);
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    checkSecretUrlTriggers();
+    window.addEventListener('hashchange', checkSecretUrlTriggers);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('hashchange', checkSecretUrlTriggers);
+    };
+  }, []);
 
   const [config, setConfig] = useState<PwaConfig>({
     url: 'https://script.google.com/macros/s/AKfycbwRMgTWzMfUhkwJSNlV84ecoLJ8w1j79qOIt5GhvWRkrQA7fEfsy5uXanVYqmaGI569CA/exec',
@@ -65,7 +110,11 @@ export default function App() {
           />
         )}
         {currentView === 'simulator' && (
-          <PwaSimulator config={config} />
+          <PwaSimulator 
+            config={config} 
+            isPro={licenseStatus.isPro}
+            onOpenUpgradeModal={() => setIsLicenseModalOpen(true)}
+          />
         )}
         {currentView === 'guide' && (
           <PwaGuide />
@@ -77,7 +126,6 @@ export default function App() {
         isOpen={isLicenseModalOpen}
         onClose={() => setIsLicenseModalOpen(false)}
         onLicenseChanged={refreshLicense}
-        onOpenAdminPortal={() => setIsAdminModalOpen(true)}
       />
 
       {/* Secret Developer License Generator Portal (PIN: 399339) */}
